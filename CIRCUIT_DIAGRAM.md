@@ -1,21 +1,143 @@
 # SƠ ĐỒ MÔ HÌNH MẠCH VÀ KẾT NỐI PHẦN CỨNG
 **Dự án:** Điều khiển 2 động cơ độc lập qua Bluetooth Low Energy (Adafruit Bluefruit LE Connect)  
 **Vi điều khiển:** ESP32-C3-FN4 (Flash 4MB)  
-**Mạch công suất:** Driver cầu H kép MX1508 (Dual DC Motor Driver)
+**Mạch công suất hỗ trợ:** 
+1. **MX1508** (Driver cầu H kép mini, gọn nhẹ cho xe nhỏ)
+2. **L298N** (Driver cầu H kép tải cao, có tích hợp IC hạ áp 5V nuôi ESP32)
 
 ---
 
-## 1. SƠ ĐỒ KHỐI HỆ THỐNG (MERMAID DIAGRAM)
+## 1. MÔ HÌNH MẠCH VỚI DRIVER L298N (MỚI)
+
+### 1.1. Sơ đồ khối L298N (Mermaid Flowchart)
+
+```mermaid
+flowchart TD
+    subgraph Power_Source ["🔋 KHỐI NGUỒN CẤP CHÍNH (7.4V - 12V)"]
+        BAT["Khối Pin 7.4V (2S 18650) hoặc 11.1V (3S)"]
+        SW["Công tắc nguồn chính"]
+        BAT --> SW
+    end
+
+    subgraph L298N_Driver ["⚡ MODULE DRIVER CẦU H L298N"]
+        VMS["Cọc 12V / VMS (Nguồn Động cơ)"]
+        L298N_GND["Cọc GND (Mass)"]
+        REG_5V["Cọc 5V (Xuất nguồn 5V từ IC 78M05 tích hợp)"]
+        JUMP_5V["Jumper 5V Enable (Gắn vào khi V_Motor <= 12V)"]
+        
+        ENA["Chân ENA (PWM Motor 1)"]
+        IN1["Chân IN1"]
+        IN2["Chân IN2"]
+        IN3["Chân IN3"]
+        IN4["Chân IN4"]
+        ENB["Chân ENB (PWM Motor 2)"]
+        
+        OUT_A["Cọc OUT1, OUT2 (Kênh A)"]
+        OUT_B["Cọc OUT3, OUT4 (Kênh B)"]
+    end
+
+    subgraph ESP32_Controller ["💻 VI ĐIỀU KHIỂN ESP32-C3-FN4"]
+        ESP_VIN["Chân 5V / VIN"]
+        ESP_GND["Chân GND"]
+        ESP_G3["GPIO 3 (PWM ENA)"]
+        ESP_G4["GPIO 4 (IN1)"]
+        ESP_G5["GPIO 5 (IN2)"]
+        ESP_G6["GPIO 6 (IN3)"]
+        ESP_G7["GPIO 7 (IN4)"]
+        ESP_G10["GPIO 10 (PWM ENB)"]
+    end
+
+    subgraph Actuators ["⚙️ CÁC ĐỘNG CƠ CHẤP HÀNH"]
+        M1["Động cơ 1 (2 Bánh xe Tiến / Lùi)"]
+        M2["Động cơ 2 (Quay 2s Thuận -> 2s Ngược)"]
+    end
+
+    %% Cấp nguồn từ pin vào L298N
+    SW -->|Dương nguồn 7.4V - 12V| VMS
+    BAT -.->|Dây âm nguồn| L298N_GND
+
+    %% L298N hạ áp nuôi trực tiếp ESP32-C3
+    REG_5V ==>|Nuôi nguồn 5V trực tiếp| ESP_VIN
+    L298N_GND <== NỐI CHUNG MASS (COMMON GND) ==> ESP_GND
+
+    %% Tín hiệu điều khiển
+    ESP_G3 -->|Xung PWM Tốc độ A| ENA
+    ESP_G4 -->|Logic Chiều A1| IN1
+    ESP_G5 -->|Logic Chiều A2| IN2
+    ESP_G6 -->|Logic Chiều B1| IN3
+    ESP_G7 -->|Logic Chiều B2| IN4
+    ESP_G10 -->|Xung PWM Tốc độ B| ENB
+
+    %% Ra động cơ
+    OUT_A ==> M1
+    OUT_B ==> M2
+```
+
+---
+
+### 1.2. Bảng chân kết nối chi tiết (ESP32-C3 <-> L298N)
+
+| Chân ESP32-C3 | Chân L298N | Chức năng | Ghi chú kỹ thuật |
+| :--- | :--- | :--- | :--- |
+| **GPIO 3** | **ENA** | Băm xung PWM tốc độ Động cơ 1 | Rút Jumper 5V của ENA để cắm dây |
+| **GPIO 4** | **IN1** | Chiều Tiến Động cơ 1 | Mức logic 3.3V tương thích chuẩn |
+| **GPIO 5** | **IN2** | Chiều Lùi Động cơ 1 | Mức logic 3.3V tương thích chuẩn |
+| **GPIO 6** | **IN3** | Chiều Thuận Động cơ 2 | Chạy 2.0 giây đầu |
+| **GPIO 7** | **IN4** | Chiều Ngược Động cơ 2 | Tự đảo chiều 2.0 giây sau |
+| **GPIO 10** | **ENB** | Băm xung PWM tốc độ Động cơ 2 | Rút Jumper 5V của ENB để cắm dây |
+| **5V / VIN** | **Cọc 5V** | **Cấp nguồn nuôi ESP32-C3** | **L298N tự hạ áp 5V từ pin nuôi lại ESP32** |
+| **GND** | **Cọc GND** | **Mass chung (Common GND)** | **BẮT BUỘC NỐI CHUNG** |
+| — | **OUT1, OUT2** | Cực 2 động cơ bánh xe | Đấu song song 2 bánh xe cùng chiều |
+| — | **OUT3, OUT4** | Cực động cơ 2 | Cơ cấu quay 2s đảo chiều |
+| — | **Cọc 12V** | Nối cực (+) của Pin 7.4V - 12V | Nguồn chính cho toàn hệ thống |
+
+> [!TIP]
+> **Điểm vượt trội của mạch L298N so với MX1508:**  
+> Mạch L298N có sẵn IC ổn áp **78M05** trên bo mạch. Khi cấp nguồn pin từ $7.4\text{V} - 12\text{V}$ vào cọc 12V (và giữ nguyên jumper 5V-EN trên L298N), chân **5V** trên cọc domino của L298N sẽ xuất ra nguồn 5V ổn định. Ta lấy ngay chân 5V này cắm vào chân **5V/VIN** của ESP32-C3 mà **không cần mua thêm mạch giảm áp LM2596 rời**!
+
+---
+
+### 1.3. Biểu đồ chu trình hoạt động của Động cơ 2 (State Diagram)
+
+```mermaid
+stateDiagram-v2
+    [*] --> CHỜ_LỆNH: Khởi động hệ thống
+    CHỜ_LỆNH --> PHA1_QUAY_THUẬN: Nhận nút 1 / Lệnh '2' hoặc 'M2'
+    
+    state PHA1_QUAY_THUẬN {
+        IN3_HIGH: IN3 = HIGH, IN4 = LOW
+        ĐẾM_2S_THUẬN: Đếm thời gian millis() đủ 2.0s
+    }
+    
+    PHA1_QUAY_THUẬN --> PHA2_QUAY_NGƯỢC: Hết 2000ms
+    
+    state PHA2_QUAY_NGƯỢC {
+        IN4_HIGH: IN3 = LOW, IN4 = HIGH
+        ĐẾM_2S_NGƯỢC: Đếm thời gian millis() đủ 2.0s
+    }
+    
+    PHA2_QUAY_NGƯỢC --> DỪNG_VÀ_CHỜ: Hết 2000ms
+    state DỪNG_VÀ_CHỜ {
+        IN_LOW: IN3 = LOW, IN4 = LOW
+        BÁO_APP: Gửi phản hồi BLE 'Hoan thanh chu trinh'
+    }
+    
+    DỪNG_VÀ_CHỜ --> CHỜ_LỆNH: Sẵn sàng cho lần bấm tiếp theo
+```
+
+---
+
+## 2. MÔ HÌNH MẠCH VỚI DRIVER MX1508 (DỰ ÁN BAN ĐẦU)
+
+### 2.1. Sơ đồ khối MX1508 (Mermaid Flowchart)
 
 ```mermaid
 flowchart TD
     subgraph Power_Supply ["HỆ THỐNG NGUỒN CẤP"]
-        BAT["Khối Pin 7.4V (2S 18650) hoặc 5V PowerBank"]
-        SW["Công tắc nguồn chính (Power Switch)"]
-        BUCK["Mạch giảm áp 5V (LM2596/Buck) hoặc USB 5V"]
-        BAT --> SW
-        SW -->|V_Motor: 5V - 7.4V| MX_VM["Chân + (Motor VCC) trên MX1508"]
-        SW --> BUCK
+        BAT["Khối Pin 7.4V hoặc 5V"]
+        BUCK["Mạch giảm áp 5V hoặc cổng USB"]
+        BAT -->|V_Motor: 5V - 7.4V| MX_VM["Chân + trên MX1508"]
+        BAT --> BUCK
         BUCK -->|5V / 3.3V| ESP_VIN["Chân 5V / VIN trên ESP32-C3"]
     end
 
@@ -33,36 +155,31 @@ flowchart TD
         IN3["IN3"]
         IN4["IN4"]
         MX_GND["Chân - (GND)"]
-        OUT_A["Cổng MOTOR-A (OUT1, OUT2)"]
-        OUT_B["Cổng MOTOR-B (OUT3, OUT4)"]
+        OUT_A["Cổng MOTOR-A"]
+        OUT_B["Cổng MOTOR-B"]
     end
 
     subgraph Actuators ["CÁC ĐỘNG CƠ DC"]
         M1A["Động cơ Bánh Trái"]
         M1B["Động cơ Bánh Phải"]
-        M2["Động cơ 2 (Chu trình 2s Thuận / 2s Ngược)"]
+        M2["Động cơ 2 (Quay 2s Thuận / 2s Ngược)"]
     end
 
-    %% Tín hiệu điều khiển
-    ESP_IO4 -->|Tín hiệu logic M1-A| IN1
-    ESP_IO5 -->|Tín hiệu logic M1-B| IN2
-    ESP_IO6 -->|Tín hiệu logic M2-A| IN3
-    ESP_IO7 -->|Tín hiệu logic M2-B| IN4
+    ESP_IO4 --> IN1
+    ESP_IO5 --> IN2
+    ESP_IO6 --> IN3
+    ESP_IO7 --> IN4
 
-    %% Động lực học
     OUT_A --> M1A
     OUT_A --> M1B
     OUT_B --> M2
 
-    %% Nối chung Mass (Mass GND bắt buộc)
     ESP_GND <== NỐI CHUNG MASS (COMMON GND) ==> MX_GND
 ```
 
 ---
 
-## 2. BẢNG ĐẤU NỐI DÂY CHI TIẾT (WIRING TABLE)
-
-### 2.1. Tín hiệu điều khiển (ESP32-C3 <-> MX1508)
+### 2.2. Bảng đấu nối dây chi tiết (ESP32-C3 <-> MX1508)
 
 | Chân ESP32-C3 | Chân MX1508 | Chức năng điều khiển | Ghi chú |
 | :--- | :--- | :--- | :--- |
@@ -71,114 +188,18 @@ flowchart TD
 | **GPIO 6** | **IN3** | Chiều thuận Motor 2 | Quay 2 giây đầu |
 | **GPIO 7** | **IN4** | Chiều ngược Motor 2 | Đảo chiều quay 2 giây sau |
 | **GND** | **- (GND)** | **Mass chung (Common Ground)** | **BẮT BUỘC phải nối chung** |
+| — | **MOTOR-A** | 2 Động cơ bánh xe | Đấu song song cùng chiều |
+| — | **MOTOR-B** | Động cơ 2 | Cơ cấu quay 2s đảo chiều |
 
 ---
 
-### 2.2. Kết nối Động cơ (MX1508 <-> Motors)
+## 3. SO SÁNH TRỰC QUAN GIỮA L298N VÀ MX1508
 
-| Cổng ra MX1508 | Thiết bị kết nối | Mô tả hoạt động |
+| Tiêu chí | Mạch L298N | Mạch MX1508 |
 | :--- | :--- | :--- |
-| **MOTOR-A** (2 chân) | **2 Động cơ Bánh xe** (Đấu song song cùng chiều) | Điều khiển xe di chuyển **Tiến** hoặc **Lùi** |
-| **MOTOR-B** (2 chân) | **Động cơ 2** (Động cơ chức năng) | Nhấn nút -> Tự động quay thuận **2 giây** -> Đảo chiều **2 giây** -> Tự động dừng |
-
-> [!TIP]
-> **Đấu song song 2 bánh xe ở Motor 1:**  
-> Nối cực dương (+) của động cơ bánh trái với cực dương (+) của động cơ bánh phải vào cùng 1 cọc ra của cổng MOTOR-A. Tương tự, nối 2 cực âm (-) vào cọc ra còn lại. Nếu 1 bánh bị quay ngược chiều với bánh kia, chỉ cần đảo 2 dây của riêng bánh đó.
-
----
-
-### 2.3. Kết nối Nguồn điện (Power Supply)
-
-| Nguồn cấp | Cực dương (+) | Cực âm (-) | Lưu ý kỹ thuật |
-| :--- | :--- | :--- | :--- |
-| **Nguồn Động cơ** | Nối vào chân **+** của MX1508 (2V - 9.6V) | Nối vào chân **-** của MX1508 | Khuyên dùng 2 cell 18650 (7.4V) hoặc nguồn 5V riêng biệt có dòng tối thiểu 2A. |
-| **Nguồn ESP32-C3** | Nối vào chân **5V (VIN)** của ESP32-C3 | Nối vào chân **GND** của ESP32-C3 | Lấy từ mạch giảm áp (Buck 5V) hoặc cắm cáp USB Type-C trực tiếp. |
-| **Liên kết Mass** | — | **Nối tắt GND của ESP32 với chân (-) của MX1508** | **Không có liên kết này, tín hiệu điều khiển sẽ bị nhiễu hoặc motor không chạy.** |
-
----
-
-## 3. SƠ ĐỒ MẠCH TRỰC QUAN (ASCII SCHEMATIC)
-
-```text
-                +---------------------------------------+
-                |           KHỐI PIN NGUỒN              |
-                |  (2x Pin 18650 = 7.4V hoặc Pin 5V)   |
-                +-------------------+-------------------+
-                                    | (+) 7.4V
-                                    +--------------+
-                                    |              |
-                                  [Công tắc]       |
-                                    |              |
-                                    v              v
-                              +-----------+   +----------+
-                              | Hạ áp 5V  |   | Chân (+) |
-                              | (LM2596/  |   |  MX1508  |
-                              |   Buck)   |   +----+-----+
-                              +-----+-----+        |
-                                    | 5V           |
-                                    |              |
-      +-----------------------------+              |
-      |                                            |
-      v                                            v
-+------------------------+            +-------------------------+
-|   ESP32-C3-FN4         |            |      DRIVER MX1508      |
-|                        |            |                         |
-|   [5V / VIN] <---------+            |  (+) VCC [ 2V - 9.6V ]  |
-|                        |            |  (-) GND                |
-|   [GPIO 4] ------------+----------->|  IN1 (Motor 1 FWD)      |
-|   [GPIO 5] ------------+----------->|  IN2 (Motor 1 REV)      |
-|   [GPIO 6] ------------+----------->|  IN3 (Motor 2 FWD)      |
-|   [GPIO 7] ------------+----------->|  IN4 (Motor 2 REV)      |
-|                        |            |                         |
-|   [GND] ---------------+----------->|  (-) GND                |
-+------------------------+      |     +----+---------------+----+
-                                |          |               |
-                         (NỐI CHUNG MASS)  | MOTOR-A       | MOTOR-B
-                                           |               |
-                                     +-----+-----+   +-----+-----+
-                                     |           |   |           |
-                                     v           v   v           v
-                              +-------------+  +-------------+
-                              | ĐỘNG CƠ 1   |  | ĐỘNG CƠ 2   |
-                              | (2 Bánh xe) |  | (Quay 2s    |
-                              | Tiến / Lùi  |  |  Đảo chiều) |
-                              +-------------+  +-------------+
-```
-
----
-
-## 4. NGUYÊN LÝ ĐIỀU KHIỂN & BẢNG CHÂN TRỊ (TRUTH TABLE)
-
-### Động cơ 1 (Bánh xe)
-| Trạng thái | IN1 (GPIO 4) | IN2 (GPIO 5) | Hoạt động của Motor 1 |
-| :--- | :---: | :---: | :--- |
-| **Tiến (Forward)** | `HIGH` (hoặc PWM) | `LOW` (0) | Cả 2 bánh xe quay tiến |
-| **Lùi (Backward)** | `LOW` (0) | `HIGH` (hoặc PWM) | Cả 2 bánh xe quay lùi |
-| **Dừng quán tính (Coast)** | `LOW` (0) | `LOW` (0) | Động cơ nhả tự do, dừng êm |
-| **Thắng phanh (Brake)** | `HIGH` (255) | `HIGH` (255) | Khóa ngắn mạch động cơ, phanh gấp |
-
-### Động cơ 2 (Chu trình tự động 2s Thuận -> 2s Ngược)
-| Giai đoạn | IN3 (GPIO 6) | IN4 (GPIO 7) | Thời gian | Hoạt động |
-| :--- | :---: | :---: | :---: | :--- |
-| **Trạng thái chờ** | `LOW` | `LOW` | Vô hạn | Động cơ nghỉ |
-| **Pha 1: Quay thuận** | `HIGH` (PWM) | `LOW` | **Đúng 2.0 giây** | Động cơ 2 quay chiều thuận |
-| **Pha 2: Quay ngược** | `LOW` | `HIGH` (PWM) | **Đúng 2.0 giây** | Tự động đảo chiều quay ngược |
-| **Kết thúc** | `LOW` | `LOW` | — | Tự động ngắt điện, về trạng thái chờ |
-
----
-
-## 5. CÁC LƯU Ý KỸ THUẬT VÀ PHÒNG CHỐNG NHIỄU (BẮT BUỘC ĐỌC)
-
-> [!WARNING]
-> **Hiện tượng sụt áp (Brownout Reset):**  
-> Khi động cơ DC khởi động hoặc đảo chiều đột ngột, dòng khởi động có thể tăng vọt gấp 3-5 lần bình thường. Nếu dùng chung nguồn nuôi ESP32-C3 mà không lọc, điện áp cấp cho ESP32 sẽ bị sụt dưới 2.8V, làm ESP32 tự reset lại (báo lỗi *Brownout detector was triggered*).
-
-### Biện pháp xử lý tối ưu:
-1. **Nguồn cấp độc lập hoặc nguồn có dòng lớn:**  
-   - Khuyên dùng 2 cell pin 18650 mắc nối tiếp (7.4V) qua mạch hạ áp Buck LM2596 (chỉnh ra 5V nuôi ESP32-C3), còn đường 7.4V cấp trực tiếp vào chân (+) của MX1508.
-   - Hoặc cấp nguồn ESP32-C3 bằng sạc dự phòng qua cổng Type-C, còn pin riêng nuôi MX1508 (nhớ nối chung dây âm GND!).
-2. **Thêm tụ lọc nguồn tại chân MX1508:**  
-   - Hàn 1 tụ hóa **100µF – 470µF (16V/25V)** song song giữa chân (+) và chân (-) của MX1508.
-   - Mắc thêm 1 tụ gốm **100nF (104)** song song để dập xung gai điện áp cao tần.
-3. **Triệt tiêu tia lửa điện chổi than trên động cơ DC:**  
-   - Hàn 1 tụ gốm **104 (100nF)** ngay trên 2 cực của mỗi động cơ DC. Tụ này có tác dụng triệt tiêu sóng hài tia lửa điện chổi than, tránh làm nhiễu sóng Bluetooth BLE của ESP32-C3.
+| **Dòng tải liên tục** | $2.0\text{A}$ mỗi kênh (chịu tải lớn, động cơ to) | $1.5\text{A}$ mỗi kênh (nhỏ gọn, cho động cơ đồ chơi) |
+| **Điện áp nguồn động cơ** | $5\text{V} - 35\text{V}$ (rất rộng) | $2\text{V} - 9.6\text{V}$ (giới hạn dưới 10V) |
+| **Nguồn cấp cho ESP32** | **Có cổng xuất 5V trực tiếp** (nhờ IC 78M05 tích hợp) | Không có (cần thêm mạch Buck 5V riêng) |
+| **Chân điều khiển tốc độ** | Riêng biệt (chân `ENA`, `ENB`) hoặc dùng 4 chân | 4 chân logic băm xung trực tiếp |
+| **Kích thước & tản nhiệt** | Có nhôm tản nhiệt to, kích thước lớn | Cực kỳ nhỏ gọn, không có nhôm tản nhiệt |
+| **Môi trường build PlatformIO** | `pio run -e esp32-c3-l298n` | `pio run -e esp32-c3-mx1508` |
