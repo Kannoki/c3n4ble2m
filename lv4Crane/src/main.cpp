@@ -57,7 +57,7 @@ void handleRxData(const uint8_t* data, size_t length) {
                 }
                 break;
 
-            case '7': // Mũi tên TRÁI (Left arrow) -> Động cơ 2 Quay nghịch / Hạ tời
+            case '7': // Mũi tên TRÁI (Left arrow) -> Động cơ 2 Hạ tời / Quay trái thủ công
                 if (state == '1') {
                     motors.motor2Backward();
                 } else {
@@ -65,7 +65,7 @@ void handleRxData(const uint8_t* data, size_t length) {
                 }
                 break;
 
-            case '8': // Mũi tên PHẢI (Right arrow) -> Động cơ 2 Quay thuận / Kéo tời
+            case '8': // Mũi tên PHẢI (Right arrow) -> Động cơ 2 Kéo tời / Quay phải thủ công
                 if (state == '1') {
                     motors.motor2Forward();
                 } else {
@@ -73,13 +73,15 @@ void handleRxData(const uint8_t* data, size_t length) {
                 }
                 break;
 
-            case '1': // Nút số 1 (Button 1) -> Kích hoạt chu trình tự động Động cơ 2
+            case '1': // NÚT SỐ 1: Nhấn giữ quay trái -> Thả ra chờ 1s -> Kéo lên đúng thời gian đã nhấn
                 if (state == '1') {
-                    motors.motor2StartCycle();
+                    motors.btn1Pressed();
+                } else {
+                    motors.btn1Released();
                 }
                 break;
 
-            case '2': // Nút số 2 (Button 2) -> Dừng khẩn cấp toàn bộ động cơ
+            case '2': // Nút số 2 (Button 2) -> Phanh dừng khẩn cấp toàn bộ động cơ
                 if (state == '1') {
                     motors.stopAll();
                 }
@@ -115,11 +117,12 @@ void handleRxData(const uint8_t* data, size_t length) {
         motors.motor1Backward();
     } else if (cmd.equalsIgnoreCase("S") || cmd.equalsIgnoreCase("DUNG")) {
         motors.motor1Stop();
-    } else if (cmd.equalsIgnoreCase("2") || cmd.equalsIgnoreCase("M2") || cmd.equalsIgnoreCase("ACTION")) {
-        motors.motor2StartCycle();
-    } else if (cmd.equalsIgnoreCase("UP") || cmd.equalsIgnoreCase("TOI_LEN")) {
+    } else if (cmd.equalsIgnoreCase("1") || cmd.equalsIgnoreCase("TEST1") || cmd.equalsIgnoreCase("2") || cmd.equalsIgnoreCase("M2")) {
+        // Mô phỏng chu trình Nút 1 với 2000ms
+        motors.motor2StartCycle(2000);
+    } else if (cmd.equalsIgnoreCase("UP") || cmd.equalsIgnoreCase("TOI_LEN") || cmd.equalsIgnoreCase("PHAI")) {
         motors.motor2Forward();
-    } else if (cmd.equalsIgnoreCase("DOWN") || cmd.equalsIgnoreCase("TOI_XUONG")) {
+    } else if (cmd.equalsIgnoreCase("DOWN") || cmd.equalsIgnoreCase("TOI_XUONG") || cmd.equalsIgnoreCase("TRAI")) {
         motors.motor2Backward();
     } else if (cmd.equalsIgnoreCase("S2") || cmd.equalsIgnoreCase("DUNG2")) {
         motors.motor2Stop();
@@ -127,7 +130,7 @@ void handleRxData(const uint8_t* data, size_t length) {
         motors.stopAll();
     } else if (cmd.length() > 0) {
         Serial.printf("Lenh text chua ho tro: %s\n", cmd.c_str());
-        sendBleResponse("Lenh hop le: F, B, S, 2 (M2 Cycle), UP, DOWN, S2, X (Stop all)");
+        sendBleResponse("Lenh hop le: F, B, S, 1 (Test Nut 1), UP, DOWN, S2, X (Dung toan bo)");
     }
 }
 
@@ -162,9 +165,12 @@ void setup() {
     Serial.println("\n=======================================================");
     Serial.println("   CYBERBRICKED - LV4 CRANE BLE CONTROLLER");
     Serial.println("   Hardware: ESP32-C3 + DRV8833 Dual H-Bridge");
-    Serial.println("   Control & Logic: std_ble_2m (Adafruit Bluefruit NUS)");
+    Serial.println("   Control & Logic: Adafruit Bluefruit NUS");
     Serial.println("   - M1 (Motor A): Banh xe di chuyen (Tien/Lui)");
-    Serial.println("   - M2 (Motor B): Toi cau (Thuan 2s -> Nguoc 2s -> Dung)");
+    Serial.println("   - Nut 1 (Button 1):");
+    Serial.println("       + Nhan giu: Quay trai & dem thoi gian");
+    Serial.println("       + Tha ra: Dung, cho 1s");
+    Serial.println("       + Sau 1s: Tu dong keo len dung thoi gian nhan");
     Serial.println("=======================================================\n");
 
     // 1. Khởi tạo phần cứng động cơ
@@ -208,7 +214,7 @@ void setup() {
 }
 
 void loop() {
-    // Luôn cập nhật máy trạng thái non-blocking của động cơ (đặc biệt là M2 chu trình 2s)
+    // Luôn cập nhật máy trạng thái non-blocking của động cơ (xử lý Nút 1 và đếm thời gian)
     motors.update();
 
     // Tự động kích hoạt lại Advertising khi bị ngắt kết nối

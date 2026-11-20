@@ -13,12 +13,12 @@
 // Chân kích hoạt Driver (Active HIGH -> nối chân ~SLEEP của DRV8833 qua Net EN)
 #define MOTOR_ENABLE_PIN    21  // GPIO21 -> Net EN -> Pin 1 (~SLEEP)
 
-// MOTOR 1 (Kênh B trên DRV8833 -> Giắc J3 -> Cọc AOUT1 / AOUT2 hoặc BOUT1 / BOUT2)
+// MOTOR 1 (Kênh B trên DRV8833 -> Giắc J3 -> Bánh xe di chuyển)
 // BIN1 / BIN2 băm xung PWM điều khiển tốc độ & chiều quay
 #define MOTOR_A_IN1         3   // GPIO3  -> Net BIN2 -> Pin 10 (BIN2)
 #define MOTOR_A_IN2         1   // GPIO1  -> Net BIN1 -> Pin 9  (BIN1)
 
-// MOTOR 2 (Kênh A trên DRV8833 -> Giắc J4 -> Cọc AOUT1 / AOUT2)
+// MOTOR 2 (Kênh A trên DRV8833 -> Giắc J4 -> Tời cẩu / Cơ cấu tác vụ)
 // AIN1 / AIN2 điều khiển động cơ 2 (AIN2 trên GPIO9 là chân BOOT)
 #define MOTOR_B_IN1         9   // GPIO9  -> Net AIN2 -> Pin 15 (AIN2 - Chân BOOT)
 #define MOTOR_B_IN2         20  // GPIO20 -> Net AIN1 -> Pin 16 (AIN1)
@@ -52,12 +52,15 @@
 #define SPARE_GPIO          5   // GPIO5
 
 // ==============================================================================
-// CẤU HÌNH LOGIC ĐIỀU KHIỂN & BLE (THEO DỰ ÁN STD_BLE_2M)
+// CẤU HÌNH LOGIC NÚT 1 & THỜI GIAN
 // ==============================================================================
-#define DEFAULT_MOTOR_SPEED 255   // Tốc độ PWM mặc định (0 - 255)
-#define M2_RUN_DURATION_MS  2000  // Chu trình Động cơ 2 (2000ms = 2.0 giây)
+#define DEFAULT_MOTOR_SPEED         255   // Tốc độ PWM mặc định (0 - 255)
+#define BTN1_WAIT_BEFORE_RETURN_MS  1000  // Thời gian chờ sau khi thả Nút 1 (1.0 giây = 1000ms)
+#define BTN1_MAX_HOLD_DURATION_MS   60000 // Giới hạn an toàn tối đa khi nhấn giữ (60 giây)
 
-// Nordic UART Service (App Adafruit Bluefruit LE Connect)
+// ==============================================================================
+// CẤU HÌNH BLE NORDIC UART SERVICE (ADAFRUIT BLUEFRUIT LE CONNECT)
+// ==============================================================================
 #define DEVICE_NAME             "CyberBricked-lv4Crane"
 #define SERVICE_UUID            "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID_RX  "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
