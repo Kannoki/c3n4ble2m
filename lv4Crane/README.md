@@ -12,9 +12,9 @@ Dự án firmware dành cho robot cần cẩu **lv4Crane** tích hợp phần c�
    - **Xử lý chân BOOT:** Chân `MOTOR_B_IN1` (GPIO 9) được thiết lập reset ngoại vi và dùng cơ chế pull-up an toàn, bảo đảm tương thích 100% với Shield CyberBricked.
    - **Hỗ trợ đầy đủ cổng Servo:** Tích hợp định nghĩa chân chuẩn cho 4 cổng servo (`GPIO 6`, `GPIO 8`, `GPIO 4`, `GPIO 0`), còi Buzzer (`GPIO 7`) và LED RGB WS2812 (`GPIO 2`, `GPIO 10`).
 2. **Logic điều khiển chuẩn dự án `std_ble_2m` & Tính năng thông minh:**
-   - **Động cơ 1 (Motor A - Bánh xe di chuyển / Trục chính):**
-     - Phím **Mũi tên Lên (Up)**: Nhấn giữ xe chạy **Tiến**, nhả tay xe tự **Dừng** (Hold-to-run).
-     - Phím **Mũi tên Xuống (Down)**: Nhấn giữ xe chạy **Lùi**, nhả tay xe tự **Dừng** (Hold-to-run).
+   - **Động cơ 1 (Motor A - Mâm xoay cần cẩu / Trục chính):**
+     - Phím **Mũi tên Lên (Up)**: Nhấn giữ mâm xoay quay **Qua Trái (Left)**, nhả tay xe tự **Dừng** (Hold-to-run).
+     - Phím **Mũi tên Xuống (Down)**: Nhấn giữ mâm xoay quay **Qua Phải (Right)**, nhả tay xe tự **Dừng** (Hold-to-run).
    - **Động cơ 2 (Motor B - Tời cẩu / Cơ cấu tác vụ):**
      - **Tính năng Button 1 (Nhấn giữ quay trái $\rightarrow$ Sau 1s tự động kéo lên đúng thời gian đã nhấn):**
        - **Khi nhấn giữ Button 1:** Động cơ 2 quay trái (nghịch), đồng thời bộ đếm thời gian `millis()` ghi nhận thời gian nhấn liên tục.
@@ -23,7 +23,7 @@ Dự án firmware dành cho robot cần cẩu **lv4Crane** tích hợp phần c�
        - **An toàn & Lọc nhiễu:** Bỏ qua thao tác nhấp nhả ngẫu nhiên (< 50ms) và tự động ngắt nếu giữ quá 60s để phòng trường hợp rớt gói tin BLE.
      - **Chế độ thủ công (Mũi tên Trái / Phải hoặc lệnh `UP` / `DOWN` / `S2`):** Nhấn giữ để kéo hoặc hạ tời cẩu chủ động.
      - **Chu trình mẫu tự động 2s (Lệnh UART `2` hoặc `M2`):** Quay thuận 2s $\rightarrow$ Quay ngược 2s $\rightarrow$ Tự dừng.
-     - **Thuật toán Non-blocking 100%:** Toàn bộ chu trình sử dụng máy trạng thái với `millis()`, hoàn toàn không dùng hàm `delay()`. Do đó Động cơ 1 vẫn tiến/lùi mượt mà trong khi Động cơ 2 đang thực thi chu trình tự động.
+     - **Thuật toán Non-blocking 100%:** Toàn bộ chu trình sử dụng máy trạng thái với `millis()`, hoàn toàn không dùng hàm `delay()`. Do đó Động cơ 1 vẫn điều khiển xoay mượt mà trong khi Động cơ 2 đang thực thi chu trình tự động.
    - **Cơ chế an toàn (Fail-safe):** Khi ngắt kết nối BLE hoặc điện thoại ra khỏi vùng phát sóng, hệ thống lập tức ngắt toàn bộ động cơ (`stopAll()`) và tự động bật lại chế độ quảng bá (Advertising) để chờ kết nối lại.
    - **Phản hồi thời gian thực (BLE TX Feedback):** Mọi thao tác đều được gửi thông báo trạng thái tức thời về điện thoại qua BLE Notify.
 
@@ -53,7 +53,7 @@ flowchart TD
 
     subgraph Hardware ["⚙️ MẠCH CÔNG SUẤT VÀ ĐỘNG CƠ (CYBERBRICKED SHIELD)"]
         DRV["IC Cầu H Đôi DRV8833"]
-        M1["Động cơ 1: Di Chuyển (Tiến / Lùi)"]
+        M1["Động cơ 1: Mâm Xoay (Qua Trái / Qua Phải)"]
         M2["Động cơ 2: Tời Cẩu (Quay Trái / Chờ 1s / Kéo Lên)"]
     end
 
@@ -125,7 +125,7 @@ stateDiagram-v2
 
 ---
 
-### 3. Trình Tự Giao Tiếp BLE - Nút 1 (Sequence Diagram)
+### 3. Trình Tự Giao Tiếp BLE - Điều Khiển Mâm Xoay & Tời Cẩu
 
 ```mermaid
 sequenceDiagram
@@ -142,17 +142,31 @@ sequenceDiagram
     Core-->>App: Kết nối thành công (Notify TX)
 
     rect rgb(235, 245, 255)
-        note right of User: Điều khiển Động cơ 1 di chuyển (Hold-to-run)
+        note right of User: Điều khiển Động cơ 1 xoay mâm (Nút Lên -> Qua Trái, Nút Xuống -> Qua Phải)
         User->>App: Nhấn giữ Mũi tên Lên (Up)
         App->>BLE: Gửi gói tin '!B51' (Button 5 pressed)
         BLE->>Core: handleRxData("!B51")
-        Core->>Driver: motor1Forward(255)
-        Driver-->>Core: Động cơ 1 chạy Tiến
-        Core-->>App: Thông báo "[M1] Tien (Forward)"
+        Core->>Driver: motor1Left(255)
+        Driver-->>Core: Động cơ 1 quay qua Trái
+        Core-->>App: Thông báo "[M1] Qua Trai (Left)"
 
         User->>App: Nhả tay khỏi Mũi tên Lên
         App->>BLE: Gửi gói tin '!B50' (Button 5 released)
         BLE->>Core: handleRxData("!B50")
+        Core->>Driver: motor1Stop()
+        Driver-->>Core: Động cơ 1 Dừng
+        Core-->>App: Thông báo "[M1] Dung (Stop)"
+
+        User->>App: Nhấn giữ Mũi tên Xuống (Down)
+        App->>BLE: Gửi gói tin '!B61' (Button 6 pressed)
+        BLE->>Core: handleRxData("!B61")
+        Core->>Driver: motor1Right(255)
+        Driver-->>Core: Động cơ 1 quay qua Phải
+        Core-->>App: Thông báo "[M1] Qua Phai (Right)"
+
+        User->>App: Nhả tay khỏi Mũi tên Xuống
+        App->>BLE: Gửi gói tin '!B60' (Button 6 released)
+        BLE->>Core: handleRxData("!B60")
         Core->>Driver: motor1Stop()
         Driver-->>Core: Động cơ 1 Dừng
         Core-->>App: Thông báo "[M1] Dung (Stop)"
@@ -165,11 +179,11 @@ sequenceDiagram
         BLE->>Core: handleRxData("!B11") -> motors.btn1Pressed()
         Core->>Driver: Quay trái M2 & Bắt đầu tính thời gian T_hold
         Driver-->>Core: Động cơ 2 quay trái
-        Core-->>App: "[M2] Nut 1: Dang quay trai & dem thoi gian..."
+        Core-->>App: "[M2] Nut 1: Nhan giu -> Dang quay trai..."
 
         loop Trong lúc nhấn giữ (T_hold ms)
             Core->>Core: motors.update() đếm T_hold = millis() - T_start
-            note over Core,Driver: Động cơ 1 vẫn có thể tiến/lùi tự do
+            note over Core,Driver: Động cơ 1 vẫn có thể xoay trái/phải tự do
         end
 
         User->>App: Thả tay khỏi Button 1
@@ -177,7 +191,7 @@ sequenceDiagram
         BLE->>Core: handleRxData("!B10") -> motors.btn1Released()
         Core->>Driver: Dừng Động cơ 2 & Bắt đầu đếm 1s chờ
         Driver-->>Core: Động cơ 2 dừng
-        Core-->>App: "[M2] Nut 1: Da tha sau X ms. Cho 1s..."
+        Core-->>App: "[M2] Nut 1: Da tha (quay trai X ms) -> Cho 1s..."
 
         loop Trong 1.0 giây chờ (1000ms)
             Core->>Core: motors.update() kiểm tra thời gian chờ
@@ -185,7 +199,7 @@ sequenceDiagram
 
         Core->>Driver: Tự động đảo chiều kéo lên M2 trong X ms
         Driver-->>Core: Động cơ 2 quay thuận kéo lên
-        Core-->>App: "[M2] Nut 1: Tu dong keo len trong X ms..."
+        Core-->>App: "[M2] Het 1s cho -> Dang keo len dung X ms..."
 
         loop Chạy đúng X ms kéo lên
             Core->>Core: motors.update() đếm thời gian kéo lên
@@ -193,7 +207,7 @@ sequenceDiagram
 
         Core->>Driver: motor2Stop()
         Driver-->>Core: Động cơ 2 dừng hẳn
-        Core-->>App: "[M2] Nut 1: Hoan tat chu trinh tu dong keo len."
+        Core-->>App: "[M2] Da keo len hoan tat (X ms) -> Da tu dong dung."
     end
 
     rect rgb(255, 235, 235)
@@ -214,10 +228,10 @@ Chi tiết mô hình mạch điện xem tại: [CIRCUIT_DIAGRAM.md](file:///d:/C
 | Chân ESP32-C3 | Nhãn Net KiCad | Chân IC / Đầu Nối | Chức Năng Trên Bo Mạch | Ghi Chú Kỹ Thuật |
 | :--- | :--- | :--- | :--- | :--- |
 | **GPIO 21** | `EN` | Pin 1 (`~SLEEP`) của DRV8833 | Bo Shield | **Kích hoạt công suất:** Kéo mức `HIGH` để đánh thức driver DRV8833. |
-| **GPIO 3** | `BIN2` | Pin 10 (`BIN2`) của DRV8833 | Giắc Motor J3 | **Động cơ 1 - Chiều tiến:** Xung PWM LEDC Kênh 0 (1kHz, 8-bit). |
-| **GPIO 1** | `BIN1` | Pin 9 (`BIN1`) của DRV8833 | Giắc Motor J3 | **Động cơ 1 - Chiều lùi:** Xung PWM LEDC Kênh 1 (1kHz, 8-bit). |
-| **GPIO 9** | `AIN2` | Pin 15 (`AIN2`) của DRV8833 | Giắc Motor J4 | **Động cơ 2 - Chiều thuận:** Chân BOOT trên ESP32-C3; kéo pull-up an toàn. |
-| **GPIO 20** | `AIN1` | Pin 16 (`AIN1`) của DRV8833 | Giắc Motor J4 | **Động cơ 2 - Chiều nghịch:** Xung PWM LEDC Kênh 2 (1kHz, 8-bit). |
+| **GPIO 3** | `BIN2` | Pin 10 (`BIN2`) của DRV8833 | Giắc Motor J3 | **Động cơ 1 - Chiều qua phải:** Xung PWM LEDC Kênh 0 (1kHz, 8-bit). |
+| **GPIO 1** | `BIN1` | Pin 9 (`BIN1`) của DRV8833 | Giắc Motor J3 | **Động cơ 1 - Chiều qua trái:** Xung PWM LEDC Kênh 1 (1kHz, 8-bit). |
+| **GPIO 9** | `AIN2` | Pin 15 (`AIN2`) của DRV8833 | Giắc Motor J4 | **Động cơ 2 - Kéo lên:** Chân BOOT trên ESP32-C3; kéo pull-up an toàn. |
+| **GPIO 20** | `AIN1` | Pin 16 (`AIN1`) của DRV8833 | Giắc Motor J4 | **Động cơ 2 - Quay trái / hạ:** Xung PWM LEDC Kênh 2 (1kHz, 8-bit). |
 | **GPIO 4** | `SER3` | Chân 5 Giắc J10 | Giắc Servo J10 | **Cơ cấu móc cẩu:** Tín hiệu điều khiển Servo 50Hz (Chân 5 Giắc J10). |
 | **GPIO 0** | `SER4` | Chân 6 Giắc J10 | Giắc Servo J10 | **Servo 4 mở rộng:** Tín hiệu Servo 4. |
 | **GPIO 6** | `SER1` | Chân 5 Giắc J9 | Giắc Servo J9 | **Servo 1 mở rộng:** Tín hiệu Servo 1. |
@@ -235,20 +249,20 @@ Chi tiết mô hình mạch điện xem tại: [CIRCUIT_DIAGRAM.md](file:///d:/C
 1. Tải ứng dụng **Adafruit Bluefruit LE Connect** trên [App Store (iOS)](https://apps.apple.com/app/adafruit-bluefruit-le-connect/id830125974) hoặc [Google Play (Android)](https://play.google.com/store/apps/details?id=com.adafruit.bluefruit.le.connect).
 2. Bật Bluetooth trên điện thoại, mở app và kết nối với thiết bị: **`CyberBricked-lv4Crane`**.
 3. **Cách 1: Giao diện Controller -> Control Pad (Phím bấm):**
-   - ⬆️ **Mũi tên Lên (Up):** Nhấn giữ Động cơ 1 **Tiến**, nhả tay xe tự **Dừng**.
-   - ⬇️ **Mũi tên Xuống (Down):** Nhấn giữ Động cơ 1 **Lùi**, nhả tay xe tự **Dừng**.
+   - ⬆️ **Mũi tên Lên (Up):** Nhấn giữ Động cơ 1 **Qua Trái (Left)**, nhả tay xe tự **Dừng**.
+   - ⬇️ **Mũi tên Xuống (Down):** Nhấn giữ Động cơ 1 **Qua Phải (Right)**, nhả tay xe tự **Dừng**.
    - ⬅️ **Mũi tên Trái (Left):** Nhấn giữ Động cơ 2 **Hạ tời cẩu**, nhả tay tự **Dừng**.
    - ➡️ **Mũi tên Phải (Right):** Nhấn giữ Động cơ 2 **Kéo tời cẩu**, nhả tay tự **Dừng**.
    - 🔘 **Button 1:** Nhấn giữ để quay trái và đếm thời gian; khi thả ra, sau 1 giây sẽ tự động kéo lên đúng thời gian đã nhấn giữ.
    - 🔘 **Button 2:** Phanh dừng khẩn cấp toàn bộ động cơ (`stopAll`).
 4. **Cách 2: Giao diện UART Terminal (Dòng lệnh):**
-   - Gửi `F` hoặc `TIEN`: Động cơ 1 Tiến.
-   - Gửi `B` hoặc `LUI`: Động cơ 1 Lùi.
+   - Gửi `L` hoặc `TRAI`: Động cơ 1 Quay Qua Trái.
+   - Gửi `R` hoặc `PHAI`: Động cơ 1 Quay Qua Phải.
    - Gửi `S` hoặc `DUNG`: Động cơ 1 Dừng.
-   - Gửi `2` hoặc `M2`: Chạy chu trình tự động Động cơ 2 (Thuận 2s -> Nghịch 2s).
    - Gửi `UP` hoặc `TOI_LEN`: Động cơ 2 Kéo tời.
    - Gửi `DOWN` hoặc `TOI_XUONG`: Động cơ 2 Hạ tời.
    - Gửi `S2`: Động cơ 2 Dừng.
+   - Gửi `1` hoặc `TEST1`: Mô phỏng chu trình Nút 1.
    - Gửi `X` hoặc `STOP`: Dừng khẩn cấp toàn bộ hệ thống.
 
 ---

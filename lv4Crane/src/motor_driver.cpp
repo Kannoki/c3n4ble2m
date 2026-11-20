@@ -43,11 +43,11 @@ void MotorController::begin() {
     // 2. Reset GPIO9 khỏi chế độ JTAG/Boot trước khi dùng
     gpio_reset_pin(GPIO_NUM_9);
 
-    // 3. Khởi tạo PWM cho Động cơ 1 (Motor A trên giắc J3)
+    // 3. Khởi tạo PWM cho Động cơ 1 (Motor A trên giắc J3 - Mâm xoay)
     setupPwmPin(MOTOR_A_IN1, MOTOR_A_IN1_CH);
     setupPwmPin(MOTOR_A_IN2, MOTOR_A_IN2_CH);
 
-    // 4. Khởi tạo chân Động cơ 2 (Motor B trên giắc J4)
+    // 4. Khởi tạo chân Động cơ 2 (Motor B trên giắc J4 - Tời cẩu)
     pinLow(MOTOR_B_IN1);
     setupPwmPin(MOTOR_B_IN2, MOTOR_B_IN2_CH);
 
@@ -91,18 +91,18 @@ void MotorController::setMotor2Outputs(int speed) {
 }
 
 // ------------------------------------------------------------------------------
-// ĐỘNG CƠ 1: BÁNH XE DI CHUYỂN (TIẾN / LÙI)
+// ĐỘNG CƠ 1: MÂM QUAY CẦN CẨU (NÚT LÊN -> QUA TRÁI / NÚT XUỐNG -> QUA PHẢI)
 // ------------------------------------------------------------------------------
-void MotorController::motor1Forward(uint8_t speed) {
-    _m1State = M1_STATE_FORWARD;
-    setMotor1Outputs(speed);
-    notify("[M1] Tien (Forward)");
+void MotorController::motor1Left(uint8_t speed) {
+    _m1State = M1_STATE_LEFT;
+    setMotor1Outputs(-((int)speed));
+    notify("[M1] Qua Trai (Left)");
 }
 
-void MotorController::motor1Backward(uint8_t speed) {
-    _m1State = M1_STATE_BACKWARD;
-    setMotor1Outputs(-((int)speed));
-    notify("[M1] Lui (Backward)");
+void MotorController::motor1Right(uint8_t speed) {
+    _m1State = M1_STATE_RIGHT;
+    setMotor1Outputs(speed);
+    notify("[M1] Qua Phai (Right)");
 }
 
 void MotorController::motor1Stop() {
@@ -112,7 +112,7 @@ void MotorController::motor1Stop() {
 }
 
 // ------------------------------------------------------------------------------
-// ĐỘNG CƠ 2: ĐIỀU KHIỂN THỦ CÔNG
+// ĐỘNG CƠ 2: ĐIỀU KHIỂN THỦ CÔNG (TỜI CẨU)
 // ------------------------------------------------------------------------------
 void MotorController::motor2Forward(uint8_t speed) {
     _m2State = M2_STATE_IDLE; // Hủy chu trình tự động nếu đang chạy
@@ -133,7 +133,7 @@ void MotorController::motor2Stop() {
 }
 
 // ------------------------------------------------------------------------------
-// LOGIC MỚI CHO NÚT 1:
+// LOGIC NÚT 1:
 // 1. Nhấn giữ: Quay trái và đếm thời gian
 // 2. Thả ra: Dừng quay trái, chờ 1 giây
 // 3. Sau 1s: Tự động kéo lên đúng bằng thời gian đã nhấn giữ -> Tự dừng

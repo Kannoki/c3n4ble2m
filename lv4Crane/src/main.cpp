@@ -41,23 +41,23 @@ void handleRxData(const uint8_t* data, size_t length) {
         char state  = (char)data[3];
 
         switch (button) {
-            case '5': // Mũi tên LÊN (Up arrow) -> Động cơ 1 Tiến (Hold-to-run)
+            case '5': // Mũi tên LÊN (Up arrow) -> Động cơ 1 Qua Trái (Hold-to-run)
                 if (state == '1') {
-                    motors.motor1Forward();
+                    motors.motor1Left();
                 } else {
                     motors.motor1Stop();
                 }
                 break;
 
-            case '6': // Mũi tên XUỐNG (Down arrow) -> Động cơ 1 Lùi (Hold-to-run)
+            case '6': // Mũi tên XUỐNG (Down arrow) -> Động cơ 1 Qua Phải (Hold-to-run)
                 if (state == '1') {
-                    motors.motor1Backward();
+                    motors.motor1Right();
                 } else {
                     motors.motor1Stop();
                 }
                 break;
 
-            case '7': // Mũi tên TRÁI (Left arrow) -> Động cơ 2 Hạ tời / Quay trái thủ công
+            case '7': // Mũi tên TRÁI (Left arrow) -> Động cơ 2 Hạ tời thủ công
                 if (state == '1') {
                     motors.motor2Backward();
                 } else {
@@ -65,7 +65,7 @@ void handleRxData(const uint8_t* data, size_t length) {
                 }
                 break;
 
-            case '8': // Mũi tên PHẢI (Right arrow) -> Động cơ 2 Kéo tời / Quay phải thủ công
+            case '8': // Mũi tên PHẢI (Right arrow) -> Động cơ 2 Kéo tời thủ công
                 if (state == '1') {
                     motors.motor2Forward();
                 } else {
@@ -111,18 +111,18 @@ void handleRxData(const uint8_t* data, size_t length) {
     }
     cmd.trim();
 
-    if (cmd.equalsIgnoreCase("F") || cmd.equalsIgnoreCase("TIEN")) {
-        motors.motor1Forward();
-    } else if (cmd.equalsIgnoreCase("B") || cmd.equalsIgnoreCase("LUI")) {
-        motors.motor1Backward();
+    if (cmd.equalsIgnoreCase("L") || cmd.equalsIgnoreCase("TRAI") || cmd.equalsIgnoreCase("LEFT") || cmd.equalsIgnoreCase("F") || cmd.equalsIgnoreCase("TIEN")) {
+        motors.motor1Left();
+    } else if (cmd.equalsIgnoreCase("R") || cmd.equalsIgnoreCase("PHAI") || cmd.equalsIgnoreCase("RIGHT") || cmd.equalsIgnoreCase("B") || cmd.equalsIgnoreCase("LUI")) {
+        motors.motor1Right();
     } else if (cmd.equalsIgnoreCase("S") || cmd.equalsIgnoreCase("DUNG")) {
         motors.motor1Stop();
     } else if (cmd.equalsIgnoreCase("1") || cmd.equalsIgnoreCase("TEST1") || cmd.equalsIgnoreCase("2") || cmd.equalsIgnoreCase("M2")) {
         // Mô phỏng chu trình Nút 1 với 2000ms
         motors.motor2StartCycle(2000);
-    } else if (cmd.equalsIgnoreCase("UP") || cmd.equalsIgnoreCase("TOI_LEN") || cmd.equalsIgnoreCase("PHAI")) {
+    } else if (cmd.equalsIgnoreCase("UP") || cmd.equalsIgnoreCase("TOI_LEN") || cmd.equalsIgnoreCase("KEO_LEN")) {
         motors.motor2Forward();
-    } else if (cmd.equalsIgnoreCase("DOWN") || cmd.equalsIgnoreCase("TOI_XUONG") || cmd.equalsIgnoreCase("TRAI")) {
+    } else if (cmd.equalsIgnoreCase("DOWN") || cmd.equalsIgnoreCase("TOI_XUONG") || cmd.equalsIgnoreCase("HA_XUONG")) {
         motors.motor2Backward();
     } else if (cmd.equalsIgnoreCase("S2") || cmd.equalsIgnoreCase("DUNG2")) {
         motors.motor2Stop();
@@ -130,7 +130,7 @@ void handleRxData(const uint8_t* data, size_t length) {
         motors.stopAll();
     } else if (cmd.length() > 0) {
         Serial.printf("Lenh text chua ho tro: %s\n", cmd.c_str());
-        sendBleResponse("Lenh hop le: F, B, S, 1 (Test Nut 1), UP, DOWN, S2, X (Dung toan bo)");
+        sendBleResponse("Lenh hop le: L (Qua Trai), R (Qua Phai), S (Dung M1), 1 (Test Nut 1), UP (Keo toi), DOWN (Ha toi), S2, X (Dung toan bo)");
     }
 }
 
@@ -166,11 +166,12 @@ void setup() {
     Serial.println("   CYBERBRICKED - LV4 CRANE BLE CONTROLLER");
     Serial.println("   Hardware: ESP32-C3 + DRV8833 Dual H-Bridge");
     Serial.println("   Control & Logic: Adafruit Bluefruit NUS");
-    Serial.println("   - M1 (Motor A): Banh xe di chuyen (Tien/Lui)");
-    Serial.println("   - Nut 1 (Button 1):");
-    Serial.println("       + Nhan giu: Quay trai & dem thoi gian");
-    Serial.println("       + Tha ra: Dung, cho 1s");
-    Serial.println("       + Sau 1s: Tu dong keo len dung thoi gian nhan");
+    Serial.println("   - M1 (Motor A): Mam xoay can cau");
+    Serial.println("       + Nut Len (Up): Qua Trai");
+    Serial.println("       + Nut Xuong (Down): Qua Phai");
+    Serial.println("   - M2 (Motor B): Toi cau");
+    Serial.println("       + Nut 1 (Button 1): Giu quay trai -> Cho 1s -> Tu keo len");
+    Serial.println("       + Nut Trai/Phai: Ha toi / Keo toi thu cong");
     Serial.println("=======================================================\n");
 
     // 1. Khởi tạo phần cứng động cơ

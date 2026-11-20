@@ -3,11 +3,13 @@
 #include <Arduino.h>
 #include "config.h"
 
-// Trạng thái của Động cơ 1
+// Trạng thái của Động cơ 1 (Mâm xoay cần cẩu: Qua Trái / Qua Phải)
 enum Motor1State {
     M1_STATE_STOP = 0,
-    M1_STATE_FORWARD,
-    M1_STATE_BACKWARD
+    M1_STATE_LEFT,
+    M1_STATE_RIGHT,
+    M1_STATE_FORWARD = M1_STATE_LEFT,    // Alias tương thích ngược
+    M1_STATE_BACKWARD = M1_STATE_RIGHT   // Alias tương thích ngược
 };
 
 // Trạng thái của Động cơ 2 (Máy trạng thái non-blocking)
@@ -25,12 +27,15 @@ public:
     MotorController();
     void begin();
 
-    // Điều khiển Động cơ 1 (Bánh xe / Trục chính - Hold-to-run)
-    void motor1Forward(uint8_t speed = DEFAULT_MOTOR_SPEED);
-    void motor1Backward(uint8_t speed = DEFAULT_MOTOR_SPEED);
+    // Điều khiển Động cơ 1 (Mâm quay / Trục chính - Hold-to-run)
+    // Nút Lên -> Qua Trái; Nút Xuống -> Qua Phải
+    void motor1Left(uint8_t speed = DEFAULT_MOTOR_SPEED);
+    void motor1Right(uint8_t speed = DEFAULT_MOTOR_SPEED);
+    void motor1Forward(uint8_t speed = DEFAULT_MOTOR_SPEED) { motor1Left(speed); }
+    void motor1Backward(uint8_t speed = DEFAULT_MOTOR_SPEED) { motor1Right(speed); }
     void motor1Stop();
 
-    // Điều khiển Động cơ 2 thủ công
+    // Điều khiển Động cơ 2 thủ công (Tời cẩu)
     void motor2Forward(uint8_t speed = DEFAULT_MOTOR_SPEED);
     void motor2Backward(uint8_t speed = DEFAULT_MOTOR_SPEED);
     void motor2Stop();
